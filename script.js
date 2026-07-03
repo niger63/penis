@@ -63,11 +63,6 @@ const fragmentShaderSource = `
 
 
 
-function error(...msgs) {
-  const msg = msgs.join('\n');
-  console.error(...msgs);
-  //document.getElementById('errors').textContent = msgs;
-}
 function setup(canvas){
     
     
@@ -76,7 +71,7 @@ function setup(canvas){
     gl.shaderSource(vertexShader, vertexShaderSource);
     gl.compileShader(vertexShader);
     if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-        error('An error occurred compiling the shaders:', gl.getShaderInfoLog(vertexShader));
+        console.error('An error occurred compiling the shaders:', gl.getShaderInfoLog(vertexShader));
         gl.deleteShader(vertexShader);
         return null;
     }
@@ -84,7 +79,7 @@ function setup(canvas){
     gl.shaderSource(fragmentShader, fragmentShaderSource);
     gl.compileShader(fragmentShader);
     if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-        error('An error occurred compiling the shaders:', gl.getShaderInfoLog(fragmentShader));
+        console.error('An error occurred compiling the shaders:', gl.getShaderInfoLog(fragmentShader));
         gl.deleteShader(fragmentShader);
         return null;
     }
@@ -93,7 +88,7 @@ function setup(canvas){
     gl.attachShader(shaderProgram, fragmentShader);
     gl.linkProgram(shaderProgram);
     if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-        error('Unable to initialize the shader program:', gl.getProgramInfoLog(shaderProgram));
+        console.error('Unable to initialize the shader program:', gl.getProgramInfoLog(shaderProgram));
         return null;
     }
     gl.useProgram(shaderProgram);
@@ -122,47 +117,78 @@ function setResolution(x,y){
 function setScale(value){
     gl.uniform1f(scaleUniformLocation,value);
 }
-function setCenter(x,y){
-    center.x = x%2601;
-    center.y = y%2601;
-    //console.log(center);
+function setCenter(){
+    let x = center.x;
+    let y = center.y;
+    
+    console.log(center);
     gl.uniform2f(centerUniformLocation,x,y);
 }
+let stack = []
+
 function zoom(x,y,dn){
     
     if(scale < 1.5){
         scale *= 51;
         center.x*=51;
         center.y*=51;
+        stack.push(Math.floor(center.x / 2601),Math.floor(center.y / 2601));
+        center.x = center.x%2601;
+        center.y = center.y%2601;
+        console.log(Math.floor(center.x / 2601),Math.floor(center.y / 2601));
+        
         
     }
     if(scale > 51*1.5){
         scale /= 51;
+        if(stack.length!== 0){
+            let py = stack.pop();
+            let px = stack.pop();
+            
+            console.log(px,py,stack);
+            center.x += px * 2601;
+            center.y += py * 2601;
+            
+        }
         center.x/= 51;
         center.y/= 51;
+        
     }
     let ds = dn * scale;
-    setCenter(
-    center.x-(x+0.5 - width / 2) / width * 2 * ds,
-    center.y-(height - y - 1+0.5 - height / 2) / width * 2 * ds);
+    
+    center.x -= (x+0.5 - width / 2) / width * 2 * ds;
+    center.y -= (height - y - 1+0.5 - height / 2) / width * 2 * ds;
     scale += ds;
+    setCenter();
     
     
     
-    
-    //console.log(scale);
+    console.log(scale,center);
     
     
 }
 function wheel(ev){
     zoom(ev.x,ev.y,ev.deltaY * 0.001)
 }
-let mousePos = {x:0,y:0};
+let pointerPos = {x:0,y:0};
 let pressed = false;
+function setPointer(x,y){
+    pointerPos.x = x;
+    pointerPos.y = y;
+}
+function movePointer(x,y){
+    center.x-=(x - pointerPos.x) / width * 2 * scale;
+    center.y+=(y - pointerPos.y) / width * 2 * scale;
+    
+    setCenter();
+    
+    pointerPos.x = x;
+    pointerPos.y = y;
+}
+
 function mouseDown(ev){
     pressed = true;
-    mousePos.x = ev.x;
-    mousePos.y = ev.y;
+    setPointer(ev.x,ev.y);
     //console.log(ev.x);
     
 }
@@ -173,13 +199,8 @@ function mouseUp(ev){
 }
 function mouseMove(ev){
     if(pressed){
-        
+        movePointer(ev.x,ev.y);
         //console.log((ev.x - mousePos.x),mousePos);
-        setCenter(
-        center.x-(ev.x - mousePos.x) / width * 2 * scale,
-        center.y+(ev.y - mousePos.y) / width * 2 * scale)
-        mousePos.x = ev.x;
-        mousePos.y = ev.y;
     }
     
     
@@ -198,14 +219,9 @@ function touchMove(ev){
     if(touched){
         if(ev.touches.length === 1){
             if(ev.touches.length!== touhes){
-                touchPos.x = ev.touches[0].clientX;
-                touchPos.y = ev.touches[0].clientY;
+                setPointer(ev.touches[0].clientX,ev.touches[0].clientY);
             }
-            setCenter(
-            center.x-(ev.touches[0].clientX - touchPos.x) / width * 2 * scale,
-            center.y+(ev.touches[0].clientY - touchPos.y) / width * 2 * scale)
-            touchPos.x = ev.touches[0].clientX;
-            touchPos.y = ev.touches[0].clientY;
+            movePointer(ev.touches[0].clientX,ev.touches[0].clientY);
         }else if(ev.touches.length === 2){
             
             let x,y,dx,dy;
@@ -217,15 +233,10 @@ function touchMove(ev){
             
             
             if(ev.touches.length!== touhes){
-                touchPos.x = x;
-                touchPos.y = y;
+                setPointer(x,y);
                 touchDist = newDist;
             }
-            setCenter(
-            center.x-(x - touchPos.x) / width * 2 * scale,
-            center.y+(y - touchPos.y) / width * 2 * scale)
-            touchPos.x = x;
-            touchPos.y = y;
+            movePointer(x,y);
             zoom(x,y,1 - newDist / touchDist);
             touchDist = newDist;
         }
