@@ -121,21 +121,27 @@ function setCenter(){
     let x = center.x;
     let y = center.y;
     
-    console.log(center);
+    //console.log(center);
     gl.uniform2f(centerUniformLocation,x,y);
 }
 let stack = []
 
 function zoom(x,y,dn){
+    let ds = dn * scale;
+    
+    center.x -= (x+0.5 - width / 2) / width * 2 * ds;
+    center.y -= (height - y - 1+0.5 - height / 2) / width * 2 * ds;
+    scale += ds;
     
     if(scale < 1.5){
         scale *= 51;
         center.x*=51;
         center.y*=51;
+        console.log(Math.floor(center.x / 2601) ,Math.floor(center.y / 2601));
         stack.push(Math.floor(center.x / 2601),Math.floor(center.y / 2601));
-        center.x = center.x%2601;
-        center.y = center.y%2601;
-        console.log(Math.floor(center.x / 2601),Math.floor(center.y / 2601));
+        center.x = ((center.x / 2601) - Math.floor(center.x / 2601))*2601;
+        center.y = ((center.y / 2601) - Math.floor(center.y / 2601))*2601;
+        
         
         
     }
@@ -147,23 +153,19 @@ function zoom(x,y,dn){
             
             console.log(px,py,stack);
             center.x += px * 2601;
-            center.y += py * 2601;
+            center.y += (py)* 2601;
             
         }
         center.x/= 51;
         center.y/= 51;
         
     }
-    let ds = dn * scale;
     
-    center.x -= (x+0.5 - width / 2) / width * 2 * ds;
-    center.y -= (height - y - 1+0.5 - height / 2) / width * 2 * ds;
-    scale += ds;
     setCenter();
     
     
     
-    console.log(scale,center);
+    //console.log(scale,center);
     
     
 }
@@ -237,7 +239,7 @@ function touchMove(ev){
                 touchDist = newDist;
             }
             movePointer(x,y);
-            zoom(x,y,1 - newDist / touchDist);
+            zoom(x,y,touchDist / newDist - 1);
             touchDist = newDist;
         }
         touhes = ev.touches.length;
